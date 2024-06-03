@@ -27,6 +27,11 @@ def get_ec2_instances(ec2):
             instances.append(instance)
     return instances
 
+def get_tags(client, resource_id):
+    response = client.list_tags_for_resource(ResourceArn=resource_id)
+    tags = response['Tags']
+    return {tag['Key']: tag['Value'] for tag in tags}
+
 def display_tree(tree, level=0):
     for key, value in tree.items():
         print("|  " * level + "+--" + key)
@@ -34,7 +39,12 @@ def display_tree(tree, level=0):
             display_tree(value, level + 1)
         elif isinstance(value, list):
             for item in value:
-                print("|  " * (level + 1) + "+--" + str(item))
+                if isinstance(item, dict):
+                    for resource_id, tags in item.items():
+                        tag_str = " [{}]".format(", ".join(f"{k}: {v}" for k, v in tags.items()))
+                        print("|  " * (level + 1) + "+--" + resource_id + tag_str)
+                else:
+                    print("|  " * (level + 1) + "+--" + str(item))
 
 def main():
     parser = argparse.ArgumentParser(description="Query AWS resources and display them in an ASCII tree diagram.")
@@ -57,6 +67,7 @@ def main():
     s3 = session.client('s3')
     lambda_client = session.client('lambda')
     client = session.client('elbv2')
+    resource_tag_client = session.client('resourcegroupstaggingapi')
 
     vpcs = get_vpcs(ec2)
     s3_buckets = get_s3_buckets(s3)
@@ -71,17 +82,25 @@ def main():
         tree['VPCs'][vpc_id] = defaultdict(list)
 
         for bucket in s3_buckets:
-            tree['VPCs'][vpc_id]['S3 Buckets'].append(bucket['Name'])
+            bucket_name = bucket['Name']
+            tags = get_tags(resource_tag_client, f"arn:aws:s3:::{bucket_name}")
+            tree['VPCs'][vpc_id]['S3 Buckets'].append({bucket_name: tags})
 
         for function in lambda_functions:
-            tree['VPCs'][vpc_id]['Lambda Functions'].append(function['FunctionName'])
+            function_name = function['FunctionName']
+            tags = get_tags(resource_tag_client, function['FunctionArn'])
+            tree['VPCs'][vpc_id]['Lambda Functions'].append({function_name: tags})
 
         for gateway in app_gateways:
-            tree['VPCs'][vpc_id]['App Gateways'].append(gateway['LoadBalancerName'])
+            gateway_name = gateway['LoadBalancerName']
+            tags = get_tags(resource_tag_client, gateway['LoadBalancerArn'])
+            tree['VPCs'][vpc_id]['App Gateways'].append({gateway_name: tags})
 
         for instance in ec2_instances:
             if instance.get('VpcId') == vpc_id:
-                tree['VPCs'][vpc_id]['EC2 Instances'].append(instance['InstanceId'])
+                instance_id = instance['InstanceId']
+                tags = get_tags(resource_tag_client, instance['Arn'])
+                tree['VPCs'][vpc_id]['EC2 Instances'].append({instance_id: tags})
 
     display_tree(tree)
 
