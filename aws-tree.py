@@ -225,7 +225,11 @@ def main():
         'Lambda Functions': [],
         'App Gateways': [],
         'API Gateways': [],
-        'EC2 Instances': []
+        'EC2 Instances': [],
+        'SNS': [],
+        'SQS': [],
+        'Kinesis': [],
+        'DynamoDB': []
     })
 
     for vpc in vpcs:
@@ -234,24 +238,6 @@ def main():
         vpc_url = f"https://console.aws.amazon.com/vpc/home?region={region}#vpcs:VpcId={vpc_id}"
         tree[vpc_id]['Tags'] = tags
         tree[vpc_id]['URL'] = vpc_url
-
-    tree['S3 Buckets'] = []
-
-    for bucket in s3_buckets:
-        bucket_name = bucket['Name']
-        tags = get_tags(s3, bucket_name, 's3')
-        bucket_url = f"https://s3.console.aws.amazon.com/s3/buckets/{bucket_name}"
-        object_count, public_access, http_access, encryption_enabled = get_s3_bucket_info(s3, bucket_name)
-        bucket_info = {
-            'URL': bucket_url,
-            'Object Count': object_count,
-            'Public Access': public_access,
-            'HTTP Access': http_access,
-            'Encryption Enabled': encryption_enabled
-        }
-        tree['S3 Buckets'].append({bucket_name: bucket_info})
-
-    tree['API Gateways'] = []
 
     for function in lambda_functions:
         function_name = function['FunctionName']
@@ -289,6 +275,85 @@ def main():
         instance_url = f"https://console.aws.amazon.com/ec2/v2/home?region={region}#Instances:instanceId={instance_id}"
         if instance_vpc and instance_vpc in tree:
             tree[instance_vpc]['EC2 Instances'].append({instance_id: tags, 'URL': instance_url})
+
+    for bucket in s3_buckets:
+        bucket_name = bucket['Name']
+        tags = get_tags(s3, bucket_name, 's3')
+        bucket_url = f"https://s3.console.aws.amazon.com/s3/buckets/{bucket_name}"
+        object_count, public_access, http_access, encryption_enabled = get_s3_bucket_info(s3, bucket_name)
+        bucket_info = {
+            'URL': bucket_url,
+            'Object Count': object_count,
+            'Public Access': public_access,
+            'HTTP Access': http_access,
+            'Encryption Enabled': encryption_enabled
+        }
+        tree['S3 Buckets'].append({bucket_name: bucket_info})
+
+    for vpc in vpcs:
+        vpc_id = vpc['VpcId']
+        sns_client = session.client('sns')
+        try:
+            response = sns_client.list_topics()
+            topics = response['Topics']
+            for topic in topics:
+                topic_arn = topic['TopicArn']
+                if vpc_id in tree:
+                    tree[vpc_id]['SNS'].append(topic_arn)
+                else:
+                    if 'SNS' not in tree:
+                        tree['SNS'] = []
+                    tree['SNS'].append(topic_arn)
+        except Exception as e:
+            pass
+
+    for vpc in vpcs:
+        vpc_id = vpc['VpcId']
+        sqs_client = session.client('sqs')
+        try:
+            response = sqs_client.list_queues()
+            queues = response['QueueUrls']
+            for queue_url in queues:
+                if vpc_id in tree:
+                    tree[vpc_id]['SQS'].append(queue_url)
+                else:
+                    if 'SQS' not in tree:
+                        tree['SQS'] = []
+                    tree['SQS'].append(queue_url)
+        except Exception as e:
+            pass
+
+    for vpc in vpcs:
+        vpc_id = vpc['VpcId']
+        kinesis_client = session.client('kinesis')
+        try:
+            response = kinesis_client.list_streams()
+            streams = response['StreamNames']
+            for stream in streams:
+                if vpc_id in tree:
+                    tree[vpc_id]['Kinesis'].append(stream)
+                else:
+                    if 'Kinesis' not in tree:
+                        tree['Kinesis'] = []
+                    tree['Kinesis'].append(stream)
+        except Exception as e:
+            pass
+
+    for vpc in vpcs:
+        vpc_id = vpc['VpcId']
+        dynamodb_client = session.client('dynamodb')
+        try:
+            response = dynamodb_client.list_tables()
+            tables = response['TableNames']
+            for table in tables:
+                if vpc_id in tree:
+                    tree[vpc_id]['DynamoDB'].append(table)
+                else:
+                    if 'DynamoDB' not in tree:
+                        tree['DynamoDB'] = []
+                    tree['DynamoDB'].append(table)
+        except Exception as e:
+            pass
 
     clean_tree(tree)
 
