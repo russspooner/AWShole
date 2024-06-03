@@ -35,7 +35,7 @@ def get_lambda_triggers(lambda_client, function_name):
                 stream_name = mapping['EventSourceArn'].split(':')[-1]
                 trigger_info['URL'] = f"https://{region}.console.aws.amazon.com/kinesis/home?region={region}#/streams/details/{stream_name}/details"
         triggers.append(trigger_info)
-    return triggers
+    return triggers if triggers else ["None"]
 
 def get_app_gateways(client):
     response = client.describe_load_balancers()
@@ -169,13 +169,19 @@ def generate_ascii_tree(tree):
         nonlocal ascii_tree
         if isinstance(node, dict):
             for key, value in node.items():
-                ascii_tree += "|  " * level + "+--" + key + "\n"
-                traverse(value, level + 1)
-        elif isinstance(node, list):
-            for item in node:
-                traverse(item, level + 1)
-        else:
-            ascii_tree += "|  " * level + "+--" + str(node) + "\n"
+                if key == 'Triggers' and value == ["None"]:
+                    ascii_tree += "|  " * level + "+--" + key + "\n"
+                elif key == 'URL' and isinstance(value, str):
+                    ascii_tree += "|  " * level + "+--" + key + ": " + value + "\n"
+                elif isinstance(value, dict):
+                    ascii_tree += "|  " * level + "+--" + key + "\n"
+                    traverse(value, level + 1)
+                elif isinstance(value, list):
+                    ascii_tree += "|  " * level + "+--" + key + "\n"
+                    for item in value:
+                        traverse(item, level + 1)
+                else:
+                    ascii_tree += "|  " * level + "+--" + str(key) + ": " + str(value) + "\n"
 
     traverse(tree)
     return ascii_tree
@@ -254,9 +260,8 @@ def main():
         function_url = f"https://console.aws.amazon.com/lambda/home?region={region}#/functions/{function_name}"
         function_info = {
             'Runtime': function['Runtime'],
-            'Version': function['Version'],
-            'URL': function_url,
-            'Triggers': get_lambda_triggers(lambda_client, function_name)
+            'Triggers': get_lambda_triggers(lambda_client, function_name),
+            'URL': function_url
         }
         if function_vpc and function_vpc in tree:
             tree[function_vpc]['Lambda Functions'].append({function_name: function_info})
