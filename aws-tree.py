@@ -59,7 +59,9 @@ def generate_html_tree(tree, region):
         nonlocal html
         if isinstance(node, dict):
             for key, value in node.items():
-                if isinstance(value, dict):
+                if key == 'URL' and isinstance(value, str):
+                    html += f'<li><a href="{value}" target="_blank">{key}</a></li>'
+                elif isinstance(value, dict):
                     html += "<li><span class='parent'>" + key + "</span>"
                     html += "<ul class='children'>"
                     generate_html_node(value)
