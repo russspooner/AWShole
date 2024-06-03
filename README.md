@@ -20,10 +20,11 @@ Ensure you have the following Python packages installed:
 
 - boto3
 - argparse
+- tqdm
 
 You can install these dependencies using pip:
 
-pip install boto3 argparse
+pip install boto3 argparse tqdm
 
 Usage
 
