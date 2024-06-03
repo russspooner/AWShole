@@ -1,6 +1,7 @@
 import boto3
 from collections import defaultdict
 import argparse
+from botocore.exceptions import ClientError
 
 def get_vpcs(ec2):
     response = ec2.describe_vpcs()
@@ -39,15 +40,21 @@ def get_s3_bucket_info(s3, bucket_name):
     try:
         bucket_policy = s3.get_bucket_policy(Bucket=bucket_name)
         http_access = 'http' in bucket_policy['Policy']
-    except s3.exceptions.NoSuchBucketPolicy:
-        http_access = False
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NoSuchBucketPolicy':
+            http_access = False
+        else:
+            raise
 
     # Check encryption
     try:
         encryption = s3.get_bucket_encryption(Bucket=bucket_name)
         encryption_enabled = True
-    except s3.exceptions.ClientError:
-        encryption_enabled = False
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ServerSideEncryptionConfigurationNotFoundError':
+            encryption_enabled = False
+        else:
+            raise
 
     return object_count, public_access, http_access, encryption_enabled
 
