@@ -19,6 +19,10 @@ def get_app_gateways(client):
     response = client.describe_load_balancers()
     return response['LoadBalancers']
 
+def get_api_gateways(api_client):
+    response = api_client.get_rest_apis()
+    return response['items']
+
 def get_ec2_instances(ec2):
     response = ec2.describe_instances()
     instances = []
@@ -165,6 +169,7 @@ def main():
     s3 = session.client('s3')
     lambda_client = session.client('lambda')
     client = session.client('elbv2')
+    api_client = session.client('apigateway')
 
     region = args.region if args.region else session.region_name
 
@@ -172,12 +177,14 @@ def main():
     s3_buckets = get_s3_buckets(s3)
     lambda_functions = get_lambda_functions(lambda_client)
     app_gateways = get_app_gateways(client)
+    api_gateways = get_api_gateways(api_client)
     ec2_instances = get_ec2_instances(ec2)
 
     tree = defaultdict(lambda: {
         'Tags': {},
         'Lambda Functions': [],
         'App Gateways': [],
+        'API Gateways': [],
         'EC2 Instances': []
     })
 
@@ -224,6 +231,12 @@ def main():
         gateway_url = f"https://console.aws.amazon.com/ec2/v2/home?region={region}#LoadBalancers:LoadBalancerName={gateway_name}"
         if gateway_vpc and gateway_vpc in tree:
             tree[gateway_vpc]['App Gateways'].append({gateway_name: tags, 'URL': gateway_url})
+
+    for api_gateway in api_gateways:
+        api_gateway_id = api_gateway['id']
+        api_gateway_name = api_gateway['name']
+        api_gateway_url = f"https://console.aws.amazon.com/apigateway/home?region={region}#/apis/{api_gateway_id}/resources"
+        tree['API Gateways'].append({api_gateway_name: {'ID': api_gateway_id, 'URL': api_gateway_url}})
 
     for instance in ec2_instances:
         instance_id = instance['InstanceId']
