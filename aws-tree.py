@@ -35,9 +35,12 @@ def get_s3_bucket_info(s3, bucket_name):
     bucket_acl = s3.get_bucket_acl(Bucket=bucket_name)
     public_access = any(grant['Grantee'].get('URI') == 'http://acs.amazonaws.com/groups/global/AllUsers' for grant in bucket_acl['Grants'])
 
-    # Check HTTP accessibility (assuming if there's any HTTP policy, it's accessible via HTTP)
-    bucket_policy = s3.get_bucket_policy(Bucket=bucket_name)
-    http_access = 'http' in bucket_policy['Policy']
+    # Check HTTP accessibility
+    try:
+        bucket_policy = s3.get_bucket_policy(Bucket=bucket_name)
+        http_access = 'http' in bucket_policy['Policy']
+    except s3.exceptions.NoSuchBucketPolicy:
+        http_access = False
 
     # Check encryption
     try:
