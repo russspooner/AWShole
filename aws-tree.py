@@ -140,26 +140,25 @@ def main():
         tags = get_tags(ec2, vpc_id, 'vpc')
         tree['VPCs'][vpc_id].append({'Tags': tags})
 
-        for bucket in s3_buckets:
-            bucket_name = bucket['Name']
-            tags = get_tags(s3, bucket_name, 's3')
-            tree['VPCs'][vpc_id].append({'S3 Buckets': [{bucket_name: tags}]})
+    for bucket in s3_buckets:
+        bucket_name = bucket['Name']
+        tags = get_tags(s3, bucket_name, 's3')
+        tree['S3 Buckets'].append({bucket_name: tags})
 
-        for function in lambda_functions:
-            function_name = function['FunctionName']
-            tags = get_tags(lambda_client, function['FunctionArn'], 'lambda')
-            tree['VPCs'][vpc_id].append({'Lambda Functions': [{function_name: tags}]})
+    for function in lambda_functions:
+        function_name = function['FunctionName']
+        tags = get_tags(lambda_client, function['FunctionArn'], 'lambda')
+        tree['Lambda Functions'].append({function_name: tags})
 
-        for gateway in app_gateways:
-            gateway_name = gateway['LoadBalancerName']
-            tags = get_tags(client, gateway['LoadBalancerArn'], 'elbv2')
-            tree['VPCs'][vpc_id].append({'App Gateways': [{gateway_name: tags}]})
+    for gateway in app_gateways:
+        gateway_name = gateway['LoadBalancerName']
+        tags = get_tags(client, gateway['LoadBalancerArn'], 'elbv2')
+        tree['App Gateways'].append({gateway_name: tags})
 
-        for instance in ec2_instances:
-            if instance.get('VpcId') == vpc_id:
-                instance_id = instance['InstanceId']
-                tags = get_tags(ec2, instance_id, 'ec2')
-                tree['VPCs'][vpc_id].append({'EC2 Instances': [{instance_id: tags}]})
+    for instance in ec2_instances:
+        instance_id = instance['InstanceId']
+        tags = get_tags(ec2, instance_id, 'ec2')
+        tree['EC2 Instances'].append({instance_id: tags})
 
     if args.format == 'html':
         output_content = generate_html_tree(tree)
@@ -181,4 +180,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
