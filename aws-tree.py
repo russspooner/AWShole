@@ -161,6 +161,8 @@ def main():
         bucket_url = f"https://s3.console.aws.amazon.com/s3/buckets/{bucket_name}"
         # Assuming that S3 buckets are not directly associated with a VPC.
         # Adjust this if you have a way to determine VPC association.
+        if 'S3 Buckets' not in tree:
+            tree['S3 Buckets'] = []
         tree['S3 Buckets'].append({f'<a href="{bucket_url}" target="_blank">{bucket_name}</a>': tags})
 
     for function in lambda_functions:
