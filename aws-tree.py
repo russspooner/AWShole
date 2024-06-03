@@ -101,4 +101,13 @@ def main():
             tags = get_tags(client, gateway['LoadBalancerArn'], 'elbv2')
             tree['VPCs'][vpc_id]['App Gateways'].append({gateway_name: tags})
 
-        for instance in ec2_
+        for instance in ec2_instances:
+            if instance.get('VpcId') == vpc_id:
+                instance_id = instance['InstanceId']
+                tags = get_tags(ec2, instance_id, 'ec2')
+                tree['VPCs'][vpc_id]['EC2 Instances'].append({instance_id: tags})
+
+    display_tree(tree)
+
+if __name__ == "__main__":
+    main()
