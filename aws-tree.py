@@ -277,16 +277,16 @@ def main():
             tree[instance_vpc]['EC2 Instances'].append({instance_id: tags, 'URL': instance_url})
 
         for bucket in s3_buckets:
-        bucket_name = bucket['Name']
-        tags = get_tags(s3, bucket_name, 's3')
-        bucket_url = f"https://s3.console.aws.amazon.com/s3/buckets/{bucket_name}"
-        object_count, public_access, http_access, encryption_enabled = get_s3_bucket_info(s3, bucket_name)
-        bucket_info = {
-            'URL': bucket_url,
-            'Object Count': object_count,
-            'Public Access': public_access,
-            'HTTP Access': http_access,
-            'Encryption Enabled': encryption_enabled
+            bucket_name = bucket['Name']
+            tags = get_tags(s3, bucket_name, 's3')
+            bucket_url = f"https://s3.console.aws.amazon.com/s3/buckets/{bucket_name}"
+            object_count, public_access, http_access, encryption_enabled = get_s3_bucket_info(s3, bucket_name)
+            bucket_info = {
+                'URL': bucket_url,
+                'Object Count': object_count,
+                'Public Access': public_access,
+                'HTTP Access': http_access,
+                'Encryption Enabled': encryption_enabled
         }
         if 'S3 Buckets' not in tree:
             tree['S3 Buckets'] = []
