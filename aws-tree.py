@@ -41,25 +41,75 @@ def get_tags(client, resource_id, resource_type):
         tags = {}
     return tags
 
-def display_tree(tree, level=0):
+def generate_html_tree(tree):
+    html = "<!DOCTYPE html><html><head><title>AWS Resources</title>"
+    html += "<style>.tree {list-style-type: none;}"
+    html += ".tree li {margin: 0; padding: 10px 5px 0 5px; position: relative;}"
+    html += ".tree li::before {content: ''; left: -20px; position: absolute; top: 20px; width: 1px; height: calc(100% - 20px); background: #ccc;}"
+    html += ".tree li::after {content: ''; position: absolute; top: 20px; left: -20px; width: 20px; height: 1px; background: #ccc;}"
+    html += ".tree li:last-child::before {height: calc(100% - 20px);}"
+    html += ".tree li:last-child::after {display: none;}"
+    html += ".tree li .parent {cursor: pointer;}"
+    html += ".tree li .parent::before {content: '+'; color: #aaa; display: inline-block; margin-right: 5px;}"
+    html += ".tree li.open .parent::before {content: '-';}"
+    html += ".tree li .children {display: none;}"
+    html += ".tree li.open .children {display: block;}"
+    html += "</style></head><body><ul class='tree'>"
     for key, value in tree.items():
-        print("|  " * level + "+--" + key)
+        html += "<li><span class='parent'>" + key + "</span>"
+        html += "<ul class='children'>"
         if isinstance(value, dict):
-            display_tree(value, level + 1)
-        elif isinstance(value, list):
-            for item in value:
-                if isinstance(item, dict):
-                    for resource_id, tags in item.items():
-                        tag_str = " [{}]".format(", ".join(f"{k}: {v}" for k, v in tags.items()))
-                        print("|  " * (level + 1) + "+--" + resource_id + tag_str)
+            for sub_key, sub_value in value.items():
+                if isinstance(sub_value, list):
+                    for item in sub_value:
+                        if isinstance(item, dict):
+                            for resource_id, tags in item.items():
+                                tag_str = " [{}]".format(", ".join(f"{k}: {v}" for k, v in tags.items()))
+                                html += "<li>" + resource_id + tag_str + "</li>"
+                        else:
+                            html += "<li>" + str(item) + "</li>"
                 else:
-                    print("|  " * (level + 1) + "+--" + str(item))
+                    html += "<li>" + sub_key + "</li>"
+        html += "</ul></li>"
+    html += "</ul><script>"
+    html += "var toggler = document.getElementsByClassName('parent');"
+    html += "var i;"
+    html += "for (i = 0; i < toggler.length; i++) {"
+    html += "toggler[i].addEventListener('click', function() {"
+    html += "this.parentElement.querySelector('.children').classList.toggle('open');"
+    html += "});"
+    html += "}"
+    html += "</script></body></html>"
+    return html
+
+def generate_ascii_tree(tree):
+    ascii_tree = ""
+
+    def traverse(node, level=0):
+        nonlocal ascii_tree
+        for key, value in node.items():
+            ascii_tree += "|  " * level + "+--" + key + "\n"
+            if isinstance(value, dict):
+                traverse(value, level + 1)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        for resource_id, tags in item.items():
+                            tag_str = " [{}]".format(", ".join(f"{k}: {v}" for k, v in tags.items()))
+                            ascii_tree += "|  " * (level + 1) + "+--" + resource_id + tag_str + "\n"
+                    else:
+                        ascii_tree += "|  " * (level + 1) + "+--" + str(item) + "\n"
+
+    traverse(tree)
+    return ascii_tree
 
 def main():
-    parser = argparse.ArgumentParser(description="Query AWS resources and display them in an ASCII tree diagram.")
+    parser = argparse.ArgumentParser(description="Query AWS resources and display them in an HTML or ASCII tree diagram.")
     parser.add_argument("--profile", help="AWS profile name to use for authentication")
     parser.add_argument("--region", help="AWS region to query resources from")
     parser.add_argument("--config", help="Path to AWS config file")
+    parser.add_argument("--format", choices=['html', 'ascii'], default='html', help="Output format (default: html)")
+    parser.add_argument("--output", help="Output file name")
     args = parser.parse_args()
 
     session_kwargs = {}
@@ -111,7 +161,26 @@ def main():
                 tags = get_tags(ec2, instance_id, 'ec2')
                 tree['VPCs'][vpc_id]['EC2 Instances'].append({instance_id: tags})
 
-    display_tree(tree)
+    if args.format == 'html':
+        html_content = generate_html_tree(tree)
+
+        # Use AWS profile name for output filename if not provided
+        if not args.output:
+            args.output = args.profile + '.html'
+
+        # Write HTML content to file
+        with open(args.output, 'w') as f:
+            f.write(html_content)
+    elif args.format == 'ascii':
+        ascii_content = generate_ascii_tree(tree)
+
+        # Use AWS profile name for output filename if not provided
+        if not args.output:
+            args.output = args.profile + '.txt'
+
+        # Write ASCII content to file
+        with open(args.output, 'w') as f:
+            f.write(ascii_content)
 
 if __name__ == "__main__":
     main()
