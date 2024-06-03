@@ -140,19 +140,19 @@ def main():
     app_gateways = get_app_gateways(client)
     ec2_instances = get_ec2_instances(ec2)
 
-    tree = defaultdict(lambda: defaultdict(list))
+    tree = defaultdict(lambda: {
+        'Tags': {},
+        'S3 Buckets': [],
+        'Lambda Functions': [],
+        'App Gateways': [],
+        'EC2 Instances': []
+    })
 
     for vpc in vpcs:
         vpc_id = vpc['VpcId']
         tags = get_tags(ec2, vpc_id, 'vpc')
         vpc_url = f"https://console.aws.amazon.com/vpc/home?region={region}#vpcs:VpcId={vpc_id}"
-        tree['VPCs'][f'<a href="{vpc_url}" target="_blank">{vpc_id}</a>'] = {
-            'Tags': tags,
-            'S3 Buckets': [],
-            'Lambda Functions': [],
-            'App Gateways': [],
-            'EC2 Instances': []
-        }
+        tree[f'<a href="{vpc_url}" target="_blank">{vpc_id}</a>']['Tags'] = tags
 
     for bucket in s3_buckets:
         bucket_name = bucket['Name']
@@ -166,24 +166,24 @@ def main():
         function_vpc = function.get('VpcConfig', {}).get('VpcId')
         tags = get_tags(lambda_client, function['FunctionArn'], 'lambda')
         function_url = f"https://console.aws.amazon.com/lambda/home?region={region}#/functions/{function_name}"
-        if function_vpc and function_vpc in tree['VPCs']:
-            tree['VPCs'][function_vpc]['Lambda Functions'].append({f'<a href="{function_url}" target="_blank">{function_name}</a>': tags})
+        if function_vpc:
+            tree[f'<a href="{function_url}" target="_blank">{function_name}</a>']['Lambda Functions'].append({function_name: tags})
 
     for gateway in app_gateways:
         gateway_name = gateway['LoadBalancerName']
         gateway_vpc = gateway['VpcId']
         tags = get_tags(client, gateway['LoadBalancerArn'], 'elbv2')
         gateway_url = f"https://console.aws.amazon.com/ec2/v2/home?region={region}#LoadBalancers:LoadBalancerName={gateway_name}"
-        if gateway_vpc in tree['VPCs']:
-            tree['VPCs'][gateway_vpc]['App Gateways'].append({f'<a href="{gateway_url}" target="_blank">{gateway_name}</a>': tags})
+        if gateway_vpc in tree:
+            tree[gateway_vpc]['App Gateways'].append({f'<a href="{gateway_url}" target="_blank">{gateway_name}</a>': tags})
 
     for instance in ec2_instances:
         instance_id = instance['InstanceId']
         instance_vpc = instance['VpcId']
         tags = get_tags(ec2, instance_id, 'ec2')
         instance_url = f"https://console.aws.amazon.com/ec2/v2/home?region={region}#Instances:instanceId={instance_id}"
-        if instance_vpc in tree['VPCs']:
-            tree['VPCs'][instance_vpc]['EC2 Instances'].append({f'<a href="{instance_url}" target="_blank">{instance_id}</a>': tags})
+        if instance_vpc in tree:
+            tree[instance_vpc]['EC2 Instances'].append({f'<a href="{instance_url}" target="_blank">{instance_id}</a>': tags})
 
     if args.format == 'html':
         output_content = generate_html_tree(tree, region)
