@@ -133,7 +133,7 @@ def main():
     app_gateways = get_app_gateways(client)
     ec2_instances = get_ec2_instances(ec2)
 
-    tree = defaultdict(lambda: defaultdict(list))
+    tree = defaultdict(lambda: defaultdict(dict))
 
     for vpc in vpcs:
         vpc_id = vpc['VpcId']
@@ -143,22 +143,22 @@ def main():
     for bucket in s3_buckets:
         bucket_name = bucket['Name']
         tags = get_tags(s3, bucket_name, 's3')
-        tree['S3 Buckets'][bucket_name] = tags
+        tree['S3 Buckets'][bucket_name] = {'Tags': tags}
 
     for function in lambda_functions:
         function_name = function['FunctionName']
         tags = get_tags(lambda_client, function['FunctionArn'], 'lambda')
-        tree['Lambda Functions'][function_name] = tags
+        tree['Lambda Functions'][function_name] = {'Tags': tags}
 
     for gateway in app_gateways:
         gateway_name = gateway['LoadBalancerName']
         tags = get_tags(client, gateway['LoadBalancerArn'], 'elbv2')
-        tree['App Gateways'][gateway_name] = tags
+        tree['App Gateways'][gateway_name] = {'Tags': tags}
 
     for instance in ec2_instances:
         instance_id = instance['InstanceId']
         tags = get_tags(ec2, instance_id, 'ec2')
-        tree['EC2 Instances'][instance_id] = tags
+        tree['EC2 Instances'][instance_id] = {'Tags': tags}
 
     if args.format == 'html':
         output_content = generate_html_tree(tree)
