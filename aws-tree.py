@@ -55,17 +55,24 @@ def generate_html_tree(tree):
     html += ".tree li .children {display: none;}"
     html += ".tree li.open .children {display: block;}"
     html += "</style></head><body><ul class='tree'>"
-    for key, value in tree.items():
-        html += "<li><span class='parent'>" + key + "</span>"
-        html += "<ul class='children'>"
-        if isinstance(value, dict):
-            for sub_key, sub_value in value.items():
-                if isinstance(sub_value, dict):
-                    for sub_sub_key, sub_sub_value in sub_value.items():
-                        html += "<li>" + sub_sub_key + "</li>"
+    
+    def generate_html_node(node):
+        nonlocal html
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if isinstance(value, dict):
+                    html += "<li><span class='parent'>" + key + "</span>"
+                    html += "<ul class='children'>"
+                    generate_html_node(value)
+                    html += "</ul></li>"
+                elif isinstance(value, list):
+                    for item in value:
+                        generate_html_node({key: item})
                 else:
-                    html += "<li>" + sub_key + "</li>"
-        html += "</ul></li>"
+                    html += "<li>" + str(key) + "</li>"
+    
+    generate_html_node(tree)
+    
     html += "</ul><script>"
     html += "var toggler = document.getElementsByClassName('parent');"
     html += "var i;"
