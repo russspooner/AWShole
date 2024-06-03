@@ -40,7 +40,7 @@ def get_tags(client, resource_id, resource_type):
         tags = {}
     return tags
 
-def generate_html_tree(tree):
+def generate_html_tree(tree, region):
     html = "<!DOCTYPE html><html><head><title>AWS Resources</title>"
     html += "<style>.tree {list-style-type: none;}"
     html += ".tree li {margin: 0; padding: 10px 5px 0 5px; position: relative;}"
@@ -54,7 +54,7 @@ def generate_html_tree(tree):
     html += ".tree li .children {display: none;}"
     html += ".tree li.open > .children {display: block;}"
     html += "</style></head><body><ul class='tree'>"
-    
+
     def generate_html_node(node):
         nonlocal html
         if isinstance(node, dict):
@@ -74,9 +74,9 @@ def generate_html_tree(tree):
                     html += "<li>" + str(key) + ": " + str(value) + "</li>"
         else:
             html += "<li>" + str(node) + "</li>"
-    
+
     generate_html_node(tree)
-    
+
     html += "</ul><script>"
     html += "document.addEventListener('DOMContentLoaded', function() {"
     html += "var toggler = document.querySelectorAll('.parent');"
@@ -132,6 +132,8 @@ def main():
     lambda_client = session.client('lambda')
     client = session.client('elbv2')
 
+    region = args.region if args.region else session.region_name
+
     vpcs = get_vpcs(ec2)
     s3_buckets = get_s3_buckets(s3)
     lambda_functions = get_lambda_functions(lambda_client)
@@ -143,7 +145,8 @@ def main():
     for vpc in vpcs:
         vpc_id = vpc['VpcId']
         tags = get_tags(ec2, vpc_id, 'vpc')
-        tree['VPCs'][vpc_id] = {
+        vpc_url = f"https://console.aws.amazon.com/vpc/home?region={region}#vpcs:VpcId={vpc_id}"
+        tree['VPCs'][f'<a href="{vpc_url}" target="_blank">{vpc_id}</a>'] = {
             'Tags': tags,
             'S3 Buckets': [],
             'Lambda Functions': [],
@@ -154,33 +157,36 @@ def main():
     for bucket in s3_buckets:
         bucket_name = bucket['Name']
         tags = get_tags(s3, bucket_name, 's3')
-        bucket_vpc = None  # Implement logic to find the VPC for the bucket if applicable
-        if bucket_vpc and bucket_vpc in tree['VPCs']:
-            tree['VPCs'][bucket_vpc]['S3 Buckets'].append({bucket_name: tags})
+        bucket_url = f"https://s3.console.aws.amazon.com/s3/buckets/{bucket_name}"
+        # Assuming that S3 buckets are not directly associated with a VPC.
+        tree['S3 Buckets'].append({f'<a href="{bucket_url}" target="_blank">{bucket_name}</a>': tags})
 
     for function in lambda_functions:
         function_name = function['FunctionName']
         function_vpc = function.get('VpcConfig', {}).get('VpcId')
         tags = get_tags(lambda_client, function['FunctionArn'], 'lambda')
+        function_url = f"https://console.aws.amazon.com/lambda/home?region={region}#/functions/{function_name}"
         if function_vpc and function_vpc in tree['VPCs']:
-            tree['VPCs'][function_vpc]['Lambda Functions'].append({function_name: tags})
+            tree['VPCs'][function_vpc]['Lambda Functions'].append({f'<a href="{function_url}" target="_blank">{function_name}</a>': tags})
 
     for gateway in app_gateways:
         gateway_name = gateway['LoadBalancerName']
         gateway_vpc = gateway['VpcId']
         tags = get_tags(client, gateway['LoadBalancerArn'], 'elbv2')
+        gateway_url = f"https://console.aws.amazon.com/ec2/v2/home?region={region}#LoadBalancers:LoadBalancerName={gateway_name}"
         if gateway_vpc in tree['VPCs']:
-            tree['VPCs'][gateway_vpc]['App Gateways'].append({gateway_name: tags})
+            tree['VPCs'][gateway_vpc]['App Gateways'].append({f'<a href="{gateway_url}" target="_blank">{gateway_name}</a>': tags})
 
     for instance in ec2_instances:
         instance_id = instance['InstanceId']
         instance_vpc = instance['VpcId']
         tags = get_tags(ec2, instance_id, 'ec2')
+        instance_url = f"https://console.aws.amazon.com/ec2/v2/home?region={region}#Instances:instanceId={instance_id}"
         if instance_vpc in tree['VPCs']:
-            tree['VPCs'][instance_vpc]['EC2 Instances'].append({instance_id: tags})
+            tree['VPCs'][instance_vpc]['EC2 Instances'].append({f'<a href="{instance_url}" target="_blank">{instance_id}</a>': tags})
 
     if args.format == 'html':
-        output_content = generate_html_tree(tree)
+        output_content = generate_html_tree(tree, region)
         file_extension = 'html'
     else:
         output_content = generate_ascii_tree(tree)
