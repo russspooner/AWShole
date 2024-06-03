@@ -15,6 +15,28 @@ def get_lambda_functions(lambda_client):
     response = lambda_client.list_functions()
     return response['Functions']
 
+def get_lambda_triggers(lambda_client, function_name):
+    response = lambda_client.list_event_source_mappings(FunctionName=function_name)
+    triggers = []
+    for mapping in response['EventSourceMappings']:
+        trigger_info = {'UUID': mapping['UUID'], 'EventSourceArn': mapping['EventSourceArn']}
+        # Adding URLs if available
+        if 'EventSourceArn' in mapping:
+            if mapping['EventSourceArn'].startswith('arn:aws:sqs:'):
+                region = mapping['EventSourceArn'].split(':')[3]
+                queue_name = mapping['EventSourceArn'].split(':')[-1]
+                trigger_info['URL'] = f"https://{region}.console.aws.amazon.com/sqs/v2/home?region={region}#/queues/https%3A%2F%2Fsqs.{region}.amazonaws.com%2F{queue_name}"
+            elif mapping['EventSourceArn'].startswith('arn:aws:dynamodb:'):
+                region = mapping['EventSourceArn'].split(':')[3]
+                table_name = mapping['EventSourceArn'].split(':')[-1]
+                trigger_info['URL'] = f"https://{region}.console.aws.amazon.com/dynamodb/home?region={region}#tables:selected={table_name}"
+            elif mapping['EventSourceArn'].startswith('arn:aws:kinesis:'):
+                region = mapping['EventSourceArn'].split(':')[3]
+                stream_name = mapping['EventSourceArn'].split(':')[-1]
+                trigger_info['URL'] = f"https://{region}.console.aws.amazon.com/kinesis/home?region={region}#/streams/details/{stream_name}/details"
+        triggers.append(trigger_info)
+    return triggers
+
 def get_app_gateways(client):
     response = client.describe_load_balancers()
     return response['LoadBalancers']
@@ -233,7 +255,8 @@ def main():
         function_info = {
             'Runtime': function['Runtime'],
             'Version': function['Version'],
-            'URL': function_url
+            'URL': function_url,
+            'Triggers': get_lambda_triggers(lambda_client, function_name)
         }
         if function_vpc and function_vpc in tree:
             tree[function_vpc]['Lambda Functions'].append({function_name: function_info})
