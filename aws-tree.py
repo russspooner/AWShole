@@ -60,14 +60,9 @@ def generate_html_tree(tree):
         html += "<ul class='children'>"
         if isinstance(value, dict):
             for sub_key, sub_value in value.items():
-                if isinstance(sub_value, list):
-                    for item in sub_value:
-                        if isinstance(item, dict):
-                            for resource_id, tags in item.items():
-                                tag_str = " [{}]".format(", ".join(f"{k}: {v}" for k, v in tags.items()))
-                                html += "<li>" + resource_id + tag_str + "</li>"
-                        else:
-                            html += "<li>" + str(item) + "</li>"
+                if isinstance(sub_value, dict):
+                    for sub_sub_key, sub_sub_value in sub_value.items():
+                        html += "<li>" + sub_sub_key + "</li>"
                 else:
                     html += "<li>" + sub_key + "</li>"
         html += "</ul></li>"
