@@ -75,12 +75,16 @@ def generate_html_tree(tree):
     
     html += "</ul><script>"
     html += "document.addEventListener('DOMContentLoaded', function() {"
+    html += "console.log('DOM loaded');"
     html += "var toggler = document.querySelectorAll('.parent');"
     html += "toggler.forEach(function(item) {"
+    html += "console.log('Adding click listener');"
     html += "item.addEventListener('click', function() {"
+    html += "console.log('Parent clicked');"
     html += "var parent = this.parentElement;"
     html += "var children = parent.querySelector('.children');"
     html += "if (children) {"
+    html += "console.log('Children found');"
     html += "children.classList.toggle('open');"
     html += "}"
     html += "});"
@@ -88,6 +92,7 @@ def generate_html_tree(tree):
     html += "});"
     html += "</script></body></html>"
     return html
+
 
 def generate_ascii_tree(tree):
     ascii_tree = ""
