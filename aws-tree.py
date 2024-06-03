@@ -162,25 +162,23 @@ def main():
                 tree['VPCs'][vpc_id]['EC2 Instances'].append({instance_id: tags})
 
     if args.format == 'html':
-        html_content = generate_html_tree(tree)
+        output_content = generate_html_tree(tree)
+        file_extension = 'html'
+    else:
+        output_content = generate_ascii_tree(tree)
+        file_extension = 'txt'
 
-        # Use AWS profile name for output filename if not provided
-        if not args.output:
-            args.output = args.profile + '.html'
+    # Use AWS profile name for output filename if not provided
+    if args.output:
+        output_filename = args.output
+    elif args.profile:
+        output_filename = args.profile + '.' + file_extension
+    else:
+        output_filename = 'output.' + file_extension
 
-        # Write HTML content to file
-        with open(args.output, 'w') as f:
-            f.write(html_content)
-    elif args.format == 'ascii':
-        ascii_content = generate_ascii_tree(tree)
-
-        # Use AWS profile name for output filename if not provided
-        if not args.output:
-            args.output = args.profile + '.txt'
-
-        # Write ASCII content to file
-        with open(args.output, 'w') as f:
-            f.write(ascii_content)
+    with open(output_filename, 'w') as output_file:
+        output_file.write(output_content)
 
 if __name__ == "__main__":
     main()
+
