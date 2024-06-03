@@ -76,6 +76,18 @@ def get_tags(client, resource_id, resource_type):
         tags = {}
     return tags
 
+def clean_tree(tree):
+    keys_to_delete = []
+    for key, value in tree.items():
+        if isinstance(value, list) and not value:
+            keys_to_delete.append(key)
+        elif isinstance(value, dict):
+            clean_tree(value)
+            if not value:
+                keys_to_delete.append(key)
+    for key in keys_to_delete:
+        del tree[key]
+
 def generate_html_tree(tree, region):
     html = "<!DOCTYPE html><html><head><title>AWS Resources</title>"
     html += "<style>.tree {list-style-type: none;}"
@@ -211,6 +223,8 @@ def main():
         }
         tree['S3 Buckets'].append({bucket_name: bucket_info})
 
+    tree['API Gateways'] = []
+
     for function in lambda_functions:
         function_name = function['FunctionName']
         function_vpc = function.get('VpcConfig', {}).get('VpcId')
@@ -236,6 +250,8 @@ def main():
         api_gateway_id = api_gateway['id']
         api_gateway_name = api_gateway['name']
         api_gateway_url = f"https://console.aws.amazon.com/apigateway/home?region={region}#/apis/{api_gateway_id}/resources"
+        if 'API Gateways' not in tree:
+            tree['API Gateways'] = []
         tree['API Gateways'].append({api_gateway_name: {'ID': api_gateway_id, 'URL': api_gateway_url}})
 
     for instance in ec2_instances:
@@ -245,6 +261,8 @@ def main():
         instance_url = f"https://console.aws.amazon.com/ec2/v2/home?region={region}#Instances:instanceId={instance_id}"
         if instance_vpc and instance_vpc in tree:
             tree[instance_vpc]['EC2 Instances'].append({instance_id: tags, 'URL': instance_url})
+
+    clean_tree(tree)
 
     if args.format == 'html':
         output_content = generate_html_tree(tree, region)
