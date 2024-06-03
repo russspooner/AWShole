@@ -2,6 +2,7 @@ import boto3
 from collections import defaultdict
 import argparse
 from botocore.exceptions import ClientError
+import tqdm
 
 def get_vpcs(ec2):
     response = ec2.describe_vpcs()
@@ -210,6 +211,10 @@ def main():
     lambda_client = session.client('lambda')
     client = session.client('elbv2')
     api_client = session.client('apigateway')
+    sns_client = session.client('sns')
+    sqs_client = session.client('sqs')
+    kinesis_client = session.client('kinesis')
+    dynamodb_client = session.client('dynamodb')
 
     region = args.region if args.region else session.region_name
 
@@ -225,21 +230,17 @@ def main():
         'Lambda Functions': [],
         'App Gateways': [],
         'API Gateways': [],
-        'EC2 Instances': [],
-        'SNS': [],
-        'SQS': [],
-        'Kinesis': [],
-        'DynamoDB': []
+        'EC2 Instances': []
     })
 
-    for vpc in vpcs:
+    for vpc in tqdm.tqdm(vpcs, desc="Fetching VPCs"):
         vpc_id = vpc['VpcId']
         tags = get_tags(ec2, vpc_id, 'vpc')
         vpc_url = f"https://console.aws.amazon.com/vpc/home?region={region}#vpcs:VpcId={vpc_id}"
         tree[vpc_id]['Tags'] = tags
         tree[vpc_id]['URL'] = vpc_url
 
-    for function in lambda_functions:
+    for function in tqdm.tqdm(lambda_functions, desc="Fetching Lambda Functions"):
         function_name = function['FunctionName']
         function_vpc = function.get('VpcConfig', {}).get('VpcId')
         tags = get_tags(lambda_client, function['FunctionArn'], 'lambda')
@@ -252,7 +253,7 @@ def main():
         if function_vpc and function_vpc in tree:
             tree[function_vpc]['Lambda Functions'].append({function_name: function_info})
 
-    for gateway in app_gateways:
+    for gateway in tqdm.tqdm(app_gateways, desc="Fetching App Gateways"):
         gateway_name = gateway['LoadBalancerName']
         gateway_vpc = gateway.get('VpcId')
         tags = get_tags(client, gateway['LoadBalancerArn'], 'elbv2')
@@ -260,7 +261,7 @@ def main():
         if gateway_vpc and gateway_vpc in tree:
             tree[gateway_vpc]['App Gateways'].append({gateway_name: tags, 'URL': gateway_url})
 
-    for api_gateway in api_gateways:
+    for api_gateway in tqdm.tqdm(api_gateways, desc="Fetching API Gateways"):
         api_gateway_id = api_gateway['id']
         api_gateway_name = api_gateway['name']
         api_gateway_url = f"https://console.aws.amazon.com/apigateway/home?region={region}#/apis/{api_gateway_id}/resources"
@@ -268,7 +269,7 @@ def main():
             tree['API Gateways'] = []
         tree['API Gateways'].append({api_gateway_name: {'ID': api_gateway_id, 'URL': api_gateway_url}})
 
-    for instance in ec2_instances:
+    for instance in tqdm.tqdm(ec2_instances, desc="Fetching EC2 Instances"):
         instance_id = instance['InstanceId']
         instance_vpc = instance['VpcId']
         tags = get_tags(ec2, instance_id, 'ec2')
@@ -276,86 +277,42 @@ def main():
         if instance_vpc and instance_vpc in tree:
             tree[instance_vpc]['EC2 Instances'].append({instance_id: tags, 'URL': instance_url})
 
-        for bucket in s3_buckets:
-            bucket_name = bucket['Name']
-            tags = get_tags(s3, bucket_name, 's3')
-            bucket_url = f"https://s3.console.aws.amazon.com/s3/buckets/{bucket_name}"
-            object_count, public_access, http_access, encryption_enabled = get_s3_bucket_info(s3, bucket_name)
-            bucket_info = {
-                'URL': bucket_url,
-                'Object Count': object_count,
-                'Public Access': public_access,
-                'HTTP Access': http_access,
-                'Encryption Enabled': encryption_enabled
+    for bucket in tqdm.tqdm(s3_buckets, desc="Fetching S3 Buckets"):
+        bucket_name = bucket['Name']
+        tags = get_tags(s3, bucket_name, 's3')
+        bucket_url = f"https://s3.console.aws.amazon.com/s3/buckets/{bucket_name}"
+        object_count, public_access, http_access, encryption_enabled = get_s3_bucket_info(s3, bucket_name)
+        bucket_info = {
+            'URL': bucket_url,
+            'Object Count': object_count,
+            'Public Access': public_access,
+            'HTTP Access': http_access,
+            'Encryption Enabled': encryption_enabled
         }
         if 'S3 Buckets' not in tree:
             tree['S3 Buckets'] = []
         tree['S3 Buckets'].append({bucket_name: bucket_info})
 
-    for vpc in vpcs:
-        vpc_id = vpc['VpcId']
-        sns_client = session.client('sns')
-        try:
-            response = sns_client.list_topics()
-            topics = response['Topics']
-            for topic in topics:
-                topic_arn = topic['TopicArn']
-                if vpc_id in tree:
-                    tree[vpc_id]['SNS'].append(topic_arn)
-                else:
-                    if 'SNS' not in tree:
-                        tree['SNS'] = []
-                    tree['SNS'].append(topic_arn)
-        except Exception as e:
-            pass
+    sns_topics = sns_client.list_topics()['Topics']
+    tree['SNS'] = []
+    for topic in tqdm.tqdm(sns_topics, desc="Fetching SNS Topics"):
+        topic_arn = topic['TopicArn']
+        tree['SNS'].append(topic_arn)
 
-    for vpc in vpcs:
-        vpc_id = vpc['VpcId']
-        sqs_client = session.client('sqs')
-        try:
-            response = sqs_client.list_queues()
-            queues = response['QueueUrls']
-            for queue_url in queues:
-                if vpc_id in tree:
-                    tree[vpc_id]['SQS'].append(queue_url)
-                else:
-                    if 'SQS' not in tree:
-                        tree['SQS'] = []
-                    tree['SQS'].append(queue_url)
-        except Exception as e:
-            pass
+    sqs_queues = sqs_client.list_queues().get('QueueUrls', [])
+    tree['SQS'] = []
+    for queue_url in tqdm.tqdm(sqs_queues, desc="Fetching SQS Queues"):
+        tree['SQS'].append(queue_url)
 
-    for vpc in vpcs:
-        vpc_id = vpc['VpcId']
-        kinesis_client = session.client('kinesis')
-        try:
-            response = kinesis_client.list_streams()
-            streams = response['StreamNames']
-            for stream in streams:
-                if vpc_id in tree:
-                    tree[vpc_id]['Kinesis'].append(stream)
-                else:
-                    if 'Kinesis' not in tree:
-                        tree['Kinesis'] = []
-                    tree['Kinesis'].append(stream)
-        except Exception as e:
-            pass
+    kinesis_streams = kinesis_client.list_streams()['StreamNames']
+    tree['Kinesis'] = []
+    for stream in tqdm.tqdm(kinesis_streams, desc="Fetching Kinesis Streams"):
+        tree['Kinesis'].append(stream)
 
-    for vpc in vpcs:
-        vpc_id = vpc['VpcId']
-        dynamodb_client = session.client('dynamodb')
-        try:
-            response = dynamodb_client.list_tables()
-            tables = response['TableNames']
-            for table in tables:
-                if vpc_id in tree:
-                    tree[vpc_id]['DynamoDB'].append(table)
-                else:
-                    if 'DynamoDB' not in tree:
-                        tree['DynamoDB'] = []
-                    tree['DynamoDB'].append(table)
-        except Exception as e:
-            pass
+    dynamodb_tables = dynamodb_client.list_tables()['TableNames']
+    tree['DynamoDB'] = []
+    for table in tqdm.tqdm(dynamodb_tables, desc="Fetching DynamoDB Tables"):
+        tree['DynamoDB'].append(table)
 
     clean_tree(tree)
 
