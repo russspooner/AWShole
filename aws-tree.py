@@ -165,6 +165,7 @@ def main():
         bucket_name = bucket['Name']
         tags = get_tags(s3, bucket_name, 's3')
         bucket_url = f"https://s3.console.aws.amazon.com/s3/buckets/{bucket_name}"
+        # Assuming that S3 buckets are not directly associated with a VPC.
         tree['S3 Buckets'].append({f'<a href="{bucket_url}" target="_blank">{bucket_name}</a>': tags})
 
     for function in lambda_functions:
@@ -177,7 +178,7 @@ def main():
 
     for gateway in app_gateways:
         gateway_name = gateway['LoadBalancerName']
-        gateway_vpc = gateway['VpcId']
+        gateway_vpc = gateway.get('VpcId')
         tags = get_tags(client, gateway['LoadBalancerArn'], 'elbv2')
         gateway_url = f"https://console.aws.amazon.com/ec2/v2/home?region={region}#LoadBalancers:LoadBalancerName={gateway_name}"
         if gateway_vpc in tree:
