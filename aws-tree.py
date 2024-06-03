@@ -52,7 +52,7 @@ def generate_html_tree(tree):
     html += ".tree li .parent::before {content: '+'; color: #aaa; display: inline-block; margin-right: 5px;}"
     html += ".tree li.open .parent::before {content: '-';}"
     html += ".tree li .children {display: none;}"
-    html += ".tree li.open .children {display: block;}"
+    html += ".tree li.open > .children {display: block;}"
     html += "</style></head><body><ul class='tree'>"
     
     def generate_html_node(node):
@@ -83,11 +83,7 @@ def generate_html_tree(tree):
     html += "toggler.forEach(function(item) {"
     html += "item.addEventListener('click', function() {"
     html += "var parent = this.parentElement;"
-    html += "var children = parent.querySelector('.children');"
-    html += "if (children) {"
-    html += "children.classList.toggle('open');"
     html += "parent.classList.toggle('open');"
-    html += "}"
     html += "});"
     html += "});"
     html += "});"
