@@ -74,13 +74,18 @@ def generate_html_tree(tree):
     generate_html_node(tree)
     
     html += "</ul><script>"
-    html += "var toggler = document.getElementsByClassName('parent');"
-    html += "var i;"
-    html += "for (i = 0; i < toggler.length; i++) {"
-    html += "toggler[i].addEventListener('click', function() {"
-    html += "this.parentElement.querySelector('.children').classList.toggle('open');"
-    html += "});"
+    html += "document.addEventListener('DOMContentLoaded', function() {"
+    html += "var toggler = document.querySelectorAll('.parent');"
+    html += "toggler.forEach(function(item) {"
+    html += "item.addEventListener('click', function() {"
+    html += "var parent = this.parentElement;"
+    html += "var children = parent.querySelector('.children');"
+    html += "if (children) {"
+    html += "children.classList.toggle('open');"
     html += "}"
+    html += "});"
+    html += "});"
+    html += "});"
     html += "</script></body></html>"
     return html
 
