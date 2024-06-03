@@ -27,10 +27,16 @@ def get_ec2_instances(ec2):
             instances.append(instance)
     return instances
 
-def get_tags(client, resource_id):
-    response = client.list_tags_for_resource(ResourceArn=resource_id)
-    tags = response['Tags']
-    return {tag['Key']: tag['Value'] for tag in tags}
+def get_tags(client, resource_id, resource_type):
+    if resource_type == 'ec2':
+        response = client.describe_tags(Resources=[resource_id])
+        tags = {tag['Key']: tag['Value'] for tag in response['Tags']}
+    elif resource_type == 'elbv2':
+        response = client.describe_tags(ResourceArns=[resource_id])
+        tags = {tag['Key']: tag['Value'] for tag in response['TagDescriptions'][0]['Tags']}
+    else:
+        tags = {}
+    return tags
 
 def display_tree(tree, level=0):
     for key, value in tree.items():
@@ -67,7 +73,6 @@ def main():
     s3 = session.client('s3')
     lambda_client = session.client('lambda')
     client = session.client('elbv2')
-    resource_tag_client = session.client('resourcegroupstaggingapi')
 
     vpcs = get_vpcs(ec2)
     s3_buckets = get_s3_buckets(s3)
@@ -83,23 +88,23 @@ def main():
 
         for bucket in s3_buckets:
             bucket_name = bucket['Name']
-            tags = get_tags(resource_tag_client, f"arn:aws:s3:::{bucket_name}")
+            tags = get_tags(s3, bucket_name, 's3')
             tree['VPCs'][vpc_id]['S3 Buckets'].append({bucket_name: tags})
 
         for function in lambda_functions:
             function_name = function['FunctionName']
-            tags = get_tags(resource_tag_client, function['FunctionArn'])
+            tags = get_tags(lambda_client, function['FunctionArn'], 'lambda')
             tree['VPCs'][vpc_id]['Lambda Functions'].append({function_name: tags})
 
         for gateway in app_gateways:
             gateway_name = gateway['LoadBalancerName']
-            tags = get_tags(resource_tag_client, gateway['LoadBalancerArn'])
+            tags = get_tags(client, gateway['LoadBalancerArn'], 'elbv2')
             tree['VPCs'][vpc_id]['App Gateways'].append({gateway_name: tags})
 
         for instance in ec2_instances:
             if instance.get('VpcId') == vpc_id:
                 instance_id = instance['InstanceId']
-                tags = get_tags(resource_tag_client, instance['Arn'])
+                tags = get_tags(ec2, instance_id, 'ec2')
                 tree['VPCs'][vpc_id]['EC2 Instances'].append({instance_id: tags})
 
     display_tree(tree)
