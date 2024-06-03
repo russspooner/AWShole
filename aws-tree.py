@@ -142,7 +142,6 @@ def main():
 
     tree = defaultdict(lambda: {
         'Tags': {},
-        'S3 Buckets': [],
         'Lambda Functions': [],
         'App Gateways': [],
         'EC2 Instances': []
@@ -155,14 +154,12 @@ def main():
         tree[vpc_id]['Tags'] = tags
         tree[vpc_id]['URL'] = vpc_url
 
+    tree['S3 Buckets'] = []
+
     for bucket in s3_buckets:
         bucket_name = bucket['Name']
         tags = get_tags(s3, bucket_name, 's3')
         bucket_url = f"https://s3.console.aws.amazon.com/s3/buckets/{bucket_name}"
-        # Assuming that S3 buckets are not directly associated with a VPC.
-        # Adjust this if you have a way to determine VPC association.
-        if 'S3 Buckets' not in tree:
-            tree['S3 Buckets'] = []
         tree['S3 Buckets'].append({f'<a href="{bucket_url}" target="_blank">{bucket_name}</a>': tags})
 
     for function in lambda_functions:
