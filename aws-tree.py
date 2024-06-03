@@ -34,6 +34,9 @@ def get_tags(client, resource_id, resource_type):
     elif resource_type == 'elbv2':
         response = client.describe_tags(ResourceArns=[resource_id])
         tags = {tag['Key']: tag['Value'] for tag in response['TagDescriptions'][0]['Tags']}
+    elif resource_type == 'vpc':
+        response = client.describe_tags(Filters=[{'Name': 'resource-id', 'Values': [resource_id]}])
+        tags = {tag['Key']: tag['Value'] for tag in response['Tags']}
     else:
         tags = {}
     return tags
@@ -84,7 +87,8 @@ def main():
 
     for vpc in vpcs:
         vpc_id = vpc['VpcId']
-        tree['VPCs'][vpc_id] = defaultdict(list)
+        tags = get_tags(ec2, vpc_id, 'vpc')
+        tree['VPCs'][vpc_id] = defaultdict(list, {'Tags': tags})
 
         for bucket in s3_buckets:
             bucket_name = bucket['Name']
