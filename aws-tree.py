@@ -1,7 +1,6 @@
 import boto3
 from collections import defaultdict
 import argparse
-import os
 
 def get_vpcs(ec2):
     response = ec2.describe_vpcs()
@@ -66,26 +65,28 @@ def generate_html_tree(tree):
                     generate_html_node(value)
                     html += "</ul></li>"
                 elif isinstance(value, list):
+                    html += "<li><span class='parent'>" + key + "</span>"
+                    html += "<ul class='children'>"
                     for item in value:
-                        generate_html_node({key: item})
+                        generate_html_node(item)
+                    html += "</ul></li>"
                 else:
-                    html += "<li>" + str(key) + "</li>"
+                    html += "<li>" + str(key) + ": " + str(value) + "</li>"
+        else:
+            html += "<li>" + str(node) + "</li>"
     
     generate_html_node(tree)
     
     html += "</ul><script>"
     html += "document.addEventListener('DOMContentLoaded', function() {"
-    html += "console.log('DOM loaded');"
     html += "var toggler = document.querySelectorAll('.parent');"
     html += "toggler.forEach(function(item) {"
-    html += "console.log('Adding click listener');"
     html += "item.addEventListener('click', function() {"
-    html += "console.log('Parent clicked');"
     html += "var parent = this.parentElement;"
     html += "var children = parent.querySelector('.children');"
     html += "if (children) {"
-    html += "console.log('Children found');"
     html += "children.classList.toggle('open');"
+    html += "parent.classList.toggle('open');"
     html += "}"
     html += "});"
     html += "});"
@@ -93,24 +94,20 @@ def generate_html_tree(tree):
     html += "</script></body></html>"
     return html
 
-
 def generate_ascii_tree(tree):
     ascii_tree = ""
 
     def traverse(node, level=0):
         nonlocal ascii_tree
-        for key, value in node.items():
-            ascii_tree += "|  " * level + "+--" + key + "\n"
-            if isinstance(value, dict):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                ascii_tree += "|  " * level + "+--" + key + "\n"
                 traverse(value, level + 1)
-            elif isinstance(value, list):
-                for item in value:
-                    if isinstance(item, dict):
-                        for resource_id, tags in item.items():
-                            tag_str = " [{}]".format(", ".join(f"{k}: {v}" for k, v in tags.items()))
-                            ascii_tree += "|  " * (level + 1) + "+--" + resource_id + tag_str + "\n"
-                    else:
-                        ascii_tree += "|  " * (level + 1) + "+--" + str(item) + "\n"
+        elif isinstance(node, list):
+            for item in node:
+                traverse(item, level + 1)
+        else:
+            ascii_tree += "|  " * level + "+--" + str(node) + "\n"
 
     traverse(tree)
     return ascii_tree
