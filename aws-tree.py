@@ -297,22 +297,25 @@ def main():
     tree['SNS'] = []
     for topic in tqdm.tqdm(sns_topics, desc="Fetching SNS Topics"):
         topic_arn = topic['TopicArn']
-        tree['SNS'].append(topic_arn)
+        topic_url = f"https://{region}.console.aws.amazon.com/sns/v3/home?region={region}#/topic/{topic_arn}"
+        tree['SNS'].append({topic_arn: {'URL': topic_url}})
 
     sqs_queues = sqs_client.list_queues().get('QueueUrls', [])
     tree['SQS'] = []
     for queue_url in tqdm.tqdm(sqs_queues, desc="Fetching SQS Queues"):
-        tree['SQS'].append(queue_url)
+        tree['SQS'].append({queue_url: {'URL': queue_url}})
 
     kinesis_streams = kinesis_client.list_streams()['StreamNames']
     tree['Kinesis'] = []
     for stream in tqdm.tqdm(kinesis_streams, desc="Fetching Kinesis Streams"):
-        tree['Kinesis'].append(stream)
+        stream_url = f"https://{region}.console.aws.amazon.com/kinesis/home?region={region}#/streams/details/{stream}/details"
+        tree['Kinesis'].append({stream: {'URL': stream_url}})
 
     dynamodb_tables = dynamodb_client.list_tables()['TableNames']
     tree['DynamoDB'] = []
     for table in tqdm.tqdm(dynamodb_tables, desc="Fetching DynamoDB Tables"):
-        tree['DynamoDB'].append(table)
+        table_url = f"https://{region}.console.aws.amazon.com/dynamodb/home?region={region}#tables:selected={table}"
+        tree['DynamoDB'].append({table: {'URL': table_url}})
 
     clean_tree(tree)
 
