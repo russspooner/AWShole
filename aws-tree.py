@@ -26,6 +26,28 @@ def get_ec2_instances(ec2):
             instances.append(instance)
     return instances
 
+def get_s3_bucket_info(s3, bucket_name):
+    # Get number of objects
+    objects = s3.list_objects_v2(Bucket=bucket_name)
+    object_count = objects['KeyCount']
+
+    # Check public access
+    bucket_acl = s3.get_bucket_acl(Bucket=bucket_name)
+    public_access = any(grant['Grantee'].get('URI') == 'http://acs.amazonaws.com/groups/global/AllUsers' for grant in bucket_acl['Grants'])
+
+    # Check HTTP accessibility (assuming if there's any HTTP policy, it's accessible via HTTP)
+    bucket_policy = s3.get_bucket_policy(Bucket=bucket_name)
+    http_access = 'http' in bucket_policy['Policy']
+
+    # Check encryption
+    try:
+        encryption = s3.get_bucket_encryption(Bucket=bucket_name)
+        encryption_enabled = True
+    except s3.exceptions.ClientError:
+        encryption_enabled = False
+
+    return object_count, public_access, http_access, encryption_enabled
+
 def get_tags(client, resource_id, resource_type):
     if resource_type == 'ec2':
         response = client.describe_tags(Filters=[{'Name': 'resource-id', 'Values': [resource_id]}])
@@ -162,15 +184,28 @@ def main():
         bucket_name = bucket['Name']
         tags = get_tags(s3, bucket_name, 's3')
         bucket_url = f"https://s3.console.aws.amazon.com/s3/buckets/{bucket_name}"
-        tree['S3 Buckets'].append({f'<a href="{bucket_url}" target="_blank">{bucket_name}</a>': tags})
+        object_count, public_access, http_access, encryption_enabled = get_s3_bucket_info(s3, bucket_name)
+        bucket_info = {
+            'URL': bucket_url,
+            'Object Count': object_count,
+            'Public Access': public_access,
+            'HTTP Access': http_access,
+            'Encryption Enabled': encryption_enabled
+        }
+        tree['S3 Buckets'].append({f'<a href="{bucket_url}" target="_blank">{bucket_name}</a>': bucket_info})
 
     for function in lambda_functions:
         function_name = function['FunctionName']
         function_vpc = function.get('VpcConfig', {}).get('VpcId')
         tags = get_tags(lambda_client, function['FunctionArn'], 'lambda')
         function_url = f"https://console.aws.amazon.com/lambda/home?region={region}#/functions/{function_name}"
+        function_info = {
+            'URL': function_url,
+            'Runtime': function['Runtime'],
+            'Version': function['Version']
+        }
         if function_vpc and function_vpc in tree:
-            tree[function_vpc]['Lambda Functions'].append({f'<a href="{function_url}" target="_blank">{function_name}</a>': tags})
+            tree[function_vpc]['Lambda Functions'].append({f'<a href="{function_url}" target="_blank">{function_name}</a>': function_info})
 
     for gateway in app_gateways:
         gateway_name = gateway['LoadBalancerName']
