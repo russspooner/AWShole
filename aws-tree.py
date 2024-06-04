@@ -85,6 +85,16 @@ def get_s3_bucket_info(s3, bucket_name):
 
     return object_count, public_access, http_access, encryption_enabled
 
+def get_sns_encryption(sns, topic_arn):
+    try:
+        attributes = sns.get_topic_attributes(TopicArn=topic_arn)['Attributes']
+        if 'KmsMasterKeyId' in attributes:
+            return True
+        else:
+            return False
+    except ClientError as e:
+        return False
+
 def get_tags(client, resource_id, resource_type):
     if resource_type == 'ec2':
         response = client.describe_tags(Filters=[{'Name': 'resource-id', 'Values': [resource_id]}])
@@ -314,7 +324,14 @@ def main():
     for topic in tqdm.tqdm(sns_topics, desc="Fetching SNS Topics"):
         topic_arn = topic['TopicArn']
         topic_url = f"https://{region}.console.aws.amazon.com/sns/v3/home?region={region}#/topic/{topic_arn}"
-        tree['SNS'].append({topic_arn: {'URL': topic_url}})
+        encryption_enabled = get_sns_encryption(sns_client, topic_arn)
+        topic_info = {
+            'URL': topic_url,
+            'Encryption Enabled': encryption_enabled
+        }
+        if not encryption_enabled:
+            topic_info['is_red'] = True
+        tree['SNS'].append({topic_arn: topic_info})
 
     sqs_queues = sqs_client.list_queues().get('QueueUrls', [])
     tree['SQS'] = []
