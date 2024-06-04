@@ -124,29 +124,43 @@ def generate_html_tree(tree, region):
     html += ".tree li.open .parent::before {content: '-';}"
     html += ".tree li .children {display: none;}"
     html += ".tree li.open > .children {display: block;}"
+    html += ".red {color: red;}"
     html += "</style></head><body><ul class='tree'>"
 
-    def generate_html_node(node):
+    def generate_html_node(node, parent_is_red=False):
         nonlocal html
         if isinstance(node, dict):
             for key, value in node.items():
                 if key == 'URL' and isinstance(value, str):
-                    html += f'<li><a href="{value}" target="_blank">{key}</a></li>'
+                    if parent_is_red:
+                        html += f'<li class="red"><a href="{value}" target="_blank">{key}</a></li>'
+                    else:
+                        html += f'<li><a href="{value}" target="_blank">{key}</a></li>'
                 elif isinstance(value, dict):
-                    html += "<li><span class='parent'>" + key + "</span>"
+                    is_red = parent_is_red or value.get('is_red', False)
+                    class_name = 'red' if is_red else ''
+                    html += f"<li class='parent {class_name}'>" + key + "</span>"
                     html += "<ul class='children'>"
-                    generate_html_node(value)
+                    generate_html_node(value, is_red)
                     html += "</ul></li>"
                 elif isinstance(value, list):
-                    html += "<li><span class='parent'>" + key + "</span>"
+                    is_red = parent_is_red
+                    for item in value:
+                        if isinstance(item, dict) and any(sub_item.get('is_red', False) for sub_item in item.values()):
+                            is_red = True
+                            break
+                    class_name = 'red' if is_red else ''
+                    html += f"<li class='parent {class_name}'>" + key + "</span>"
                     html += "<ul class='children'>"
                     for item in value:
-                        generate_html_node(item)
+                        generate_html_node(item, is_red)
                     html += "</ul></li>"
                 else:
-                    html += "<li>" + str(key) + ": " + str(value) + "</li>"
+                    class_name = 'red' if parent_is_red else ''
+                    html += f"<li class='{class_name}'>" + str(key) + ": " + str(value) + "</li>"
         else:
-            html += "<li>" + str(node) + "</li>"
+            class_name = 'red' if parent_is_red else ''
+            html += f"<li class='{class_name}'>" + str(node) + "</li>"
 
     generate_html_node(tree)
 
@@ -166,23 +180,30 @@ def generate_html_tree(tree, region):
 def generate_ascii_tree(tree):
     ascii_tree = ""
 
-    def traverse(node, level=0):
+    def traverse(node, level=0, parent_is_red=False):
         nonlocal ascii_tree
         if isinstance(node, dict):
             for key, value in node.items():
+                is_red = parent_is_red or value.get('is_red', False)
+                color = "\033[91m" if is_red else ""
+                reset = "\033[0m" if is_red else ""
                 if key == 'Triggers' and value == ["None"]:
                     ascii_tree += "|  " * level + "+--" + key + "\n"
                 elif key == 'URL' and isinstance(value, str):
-                    ascii_tree += "|  " * level + "+--" + key + ": " + value + "\n"
+                    ascii_tree += f"|  " * level + "+--" + color + key + ": " + value + reset + "\n"
                 elif isinstance(value, dict):
-                    ascii_tree += "|  " * level + "+--" + key + "\n"
-                    traverse(value, level + 1)
+                    ascii_tree += f"|  " * level + "+--" + color + key + reset + "\n"
+                    traverse(value, level + 1, is_red)
                 elif isinstance(value, list):
-                    ascii_tree += "|  " * level + "+--" + key + "\n"
+                    ascii_tree += f"|  " * level + "+--" + color + key + reset + "\n"
                     for item in value:
-                        traverse(item, level + 1)
+                        traverse(item, level + 1, is_red)
                 else:
-                    ascii_tree += "|  " * level + "+--" + str(key) + ": " + str(value) + "\n"
+                    ascii_tree += f"|  " * level + "+--" + color + str(key) + ": " + str(value) + reset + "\n"
+        else:
+            color = "\033[91m" if parent_is_red else ""
+            reset = "\033[0m" if parent_is_red else ""
+            ascii_tree += f"|  " * level + "+--" + color + str(node) + reset + "\n"
 
     traverse(tree)
     return ascii_tree
@@ -248,7 +269,8 @@ def main():
         function_info = {
             'Runtime': function['Runtime'],
             'Triggers': get_lambda_triggers(lambda_client, function_name),
-            'URL': function_url
+            'URL': function_url,
+            'is_red': function['Runtime'] != 'nodejs20.x'
         }
         if function_vpc and function_vpc in tree:
             tree[function_vpc]['Lambda Functions'].append({function_name: function_info})
@@ -287,7 +309,8 @@ def main():
             'Object Count': object_count,
             'Public Access': public_access,
             'HTTP Access': http_access,
-            'Encryption Enabled': encryption_enabled
+            'Encryption Enabled': encryption_enabled,
+            'is_red': not encryption_enabled or http_access
         }
         if 'S3 Buckets' not in tree:
             tree['S3 Buckets'] = []
