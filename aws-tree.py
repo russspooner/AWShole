@@ -121,57 +121,52 @@ def generate_html_tree(tree, region):
     html += ".tree li:last-child::after {display: none;}"
     html += ".tree li .parent {cursor: pointer;}"
     html += ".tree li .parent::before {content: '+'; color: #aaa; display: inline-block; margin-right: 5px;}"
-    html += ".tree li.open .parent::before {content: '-';}"
-    html += ".tree li .children {display: none;}"
-    html += ".tree li.open > .children {display: block;}"
+    html += ".tree li.open > .parent::before {content: '-';}"
+    html += ".tree .children {display: none;}"
+    html += ".tree .open > .children {display: block;}"
     html += ".red {color: red;}"
     html += "</style></head><body><ul class='tree'>"
 
-    def generate_html_node(node, parent_is_red=False):
+    def generate_html_node(node):
         nonlocal html
         if isinstance(node, dict):
             for key, value in node.items():
                 if key == 'URL' and isinstance(value, str):
-                    if parent_is_red:
-                        html += f'<li class="red"><a href="{value}" target="_blank">{key}</a></li>'
-                    else:
-                        html += f'<li><a href="{value}" target="_blank">{key}</a></li>'
+                    html += f'<li><a href="{value}" target="_blank">{key}</a></li>'
                 elif isinstance(value, dict):
-                    is_red = parent_is_red or value.get('is_red', False)
+                    is_red = value.get('is_red', False)
                     class_name = 'red' if is_red else ''
-                    html += f"<li class='parent {class_name}'>" + key + "</li>"
+                    html += f"<li><span class='parent {class_name}' onclick='toggleNode(this)'>" + key + "</span>"
                     html += "<ul class='children'>"
-                    generate_html_node(value, is_red)
+                    generate_html_node(value)
                     html += "</ul></li>"
                 elif isinstance(value, list):
-                    is_red = parent_is_red
-                    for item in value:
-                        if isinstance(item, dict) and any(isinstance(sub_item, dict) and sub_item.get('is_red', False) for sub_item in item.values()):
-                            is_red = True
-                            break
-                    class_name = 'red' if is_red else ''
-                    html += f"<li class='parent {class_name}'>" + key + "</li>"
+                    html += f"<li><span class='parent' onclick='toggleNode(this)'>" + key + "</span>"
                     html += "<ul class='children'>"
                     for item in value:
-                        generate_html_node(item, is_red)
+                        generate_html_node(item)
                     html += "</ul></li>"
                 else:
-                    class_name = 'red' if parent_is_red else ''
+                    class_name = 'red' if key == 'is_red' and value else ''
                     html += f"<li class='{class_name}'>" + str(key) + ": " + str(value) + "</li>"
         else:
-            class_name = 'red' if parent_is_red else ''
-            html += f"<li class='{class_name}'>" + str(node) + "</li>"
+            html += "<li>" + str(node) + "</li>"
 
     generate_html_node(tree)
 
     html += "</ul><script>"
-    html += "document.addEventListener('DOMContentLoaded', function() {"
-    html += "var toggler = document.querySelectorAll('.parent');"
-    html += "toggler.forEach(function(item) {"
-    html += "item.addEventListener('click', function() {"
-    html += "var parent = this.parentElement;"
+    html += "function toggleNode(element) {"
+    html += "var parent = element.parentElement;"
     html += "parent.classList.toggle('open');"
-    html += "});"
+    html += "var children = parent.querySelector('.children');"
+    html += "if (children) {"
+    html += "children.style.display = children.style.display === 'block' ? 'none' : 'block';"
+    html += "}"
+    html += "}"
+    html += "document.addEventListener('DOMContentLoaded', function() {"
+    html += "var parents = document.querySelectorAll('.parent');"
+    html += "parents.forEach(function(item) {"
+    html += "item.parentElement.classList.add('collapsed');"
     html += "});"
     html += "});"
     html += "</script></body></html>"
@@ -180,30 +175,27 @@ def generate_html_tree(tree, region):
 def generate_ascii_tree(tree):
     ascii_tree = ""
 
-    def traverse(node, level=0, parent_is_red=False):
+    def traverse(node, level=0):
         nonlocal ascii_tree
         if isinstance(node, dict):
             for key, value in node.items():
-                is_red = parent_is_red or (isinstance(value, dict) and value.get('is_red', False))
-                color = "\033[91m" if is_red else ""
-                reset = "\033[0m" if is_red else ""
+                color = "\033[91m" if (key == 'is_red' and value) else ""
+                reset = "\033[0m" if color else ""
                 if key == 'Triggers' and value == ["None"]:
                     ascii_tree += "|  " * level + "+--" + key + "\n"
                 elif key == 'URL' and isinstance(value, str):
                     ascii_tree += f"|  " * level + "+--" + color + key + ": " + value + reset + "\n"
                 elif isinstance(value, dict):
                     ascii_tree += f"|  " * level + "+--" + color + key + reset + "\n"
-                    traverse(value, level + 1, is_red)
+                    traverse(value, level + 1)
                 elif isinstance(value, list):
-                    ascii_tree += f"|  " * level + "+--" + color + key + reset + "\n"
+                    ascii_tree += f"|  " * level + "+--" + key + "\n"
                     for item in value:
-                        traverse(item, level + 1, is_red)
+                        traverse(item, level + 1)
                 else:
                     ascii_tree += f"|  " * level + "+--" + color + str(key) + ": " + str(value) + reset + "\n"
         else:
-            color = "\033[91m" if parent_is_red else ""
-            reset = "\033[0m" if parent_is_red else ""
-            ascii_tree += f"|  " * level + "+--" + color + str(node) + reset + "\n"
+            ascii_tree += "|  " * level + "+--" + str(node) + "\n"
 
     traverse(tree)
     return ascii_tree
@@ -309,9 +301,10 @@ def main():
             'Object Count': object_count,
             'Public Access': public_access,
             'HTTP Access': http_access,
-            'Encryption Enabled': encryption_enabled,
-            'is_red': not encryption_enabled or http_access
+            'Encryption Enabled': encryption_enabled
         }
+        if not encryption_enabled or http_access:
+            bucket_info['is_red'] = True
         if 'S3 Buckets' not in tree:
             tree['S3 Buckets'] = []
         tree['S3 Buckets'].append({bucket_name: bucket_info})
