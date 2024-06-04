@@ -184,7 +184,7 @@ def generate_ascii_tree(tree):
         nonlocal ascii_tree
         if isinstance(node, dict):
             for key, value in node.items():
-                is_red = parent_is_red or value.get('is_red', False)
+                is_red = parent_is_red or (isinstance(value, dict) and value.get('is_red', False))
                 color = "\033[91m" if is_red else ""
                 reset = "\033[0m" if is_red else ""
                 if key == 'Triggers' and value == ["None"]:
