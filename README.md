@@ -66,5 +66,5 @@ Notes
 
 License
 
-This project is licensed under the MIT License. Copyright Russ Spooner 2024
+This project is licensed under the GPLv3 License. Copyright Russ Spooner 2024
 
