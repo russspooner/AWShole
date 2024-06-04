@@ -139,7 +139,7 @@ def generate_html_tree(tree, region):
                 elif isinstance(value, dict):
                     is_red = parent_is_red or value.get('is_red', False)
                     class_name = 'red' if is_red else ''
-                    html += f"<li class='parent {class_name}'>" + key + "</span>"
+                    html += f"<li class='parent {class_name}'>" + key + "</li>"
                     html += "<ul class='children'>"
                     generate_html_node(value, is_red)
                     html += "</ul></li>"
@@ -150,7 +150,7 @@ def generate_html_tree(tree, region):
                             is_red = True
                             break
                     class_name = 'red' if is_red else ''
-                    html += f"<li class='parent {class_name}'>" + key + "</span>"
+                    html += f"<li class='parent {class_name}'>" + key + "</li>"
                     html += "<ul class='children'>"
                     for item in value:
                         generate_html_node(item, is_red)
