@@ -146,7 +146,7 @@ def generate_html_tree(tree, region):
                     for item in value:
                         generate_html_node(item)
                     html += "</ul></li>"
-                else:
+                elif key != 'is_red':
                     class_name = 'red' if key == 'is_red' and value else ''
                     html += f"<li class='{class_name}'>" + str(key) + ": " + str(value) + "</li>"
         else:
@@ -192,7 +192,7 @@ def generate_ascii_tree(tree):
                     ascii_tree += f"|  " * level + "+--" + key + "\n"
                     for item in value:
                         traverse(item, level + 1)
-                else:
+                elif key != 'is_red':
                     ascii_tree += f"|  " * level + "+--" + color + str(key) + ": " + str(value) + reset + "\n"
         else:
             ascii_tree += "|  " * level + "+--" + str(node) + "\n"
