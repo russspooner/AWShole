@@ -146,7 +146,7 @@ def generate_html_tree(tree, region):
                 elif isinstance(value, list):
                     is_red = parent_is_red
                     for item in value:
-                        if isinstance(item, dict) and any(sub_item.get('is_red', False) for sub_item in item.values()):
+                        if isinstance(item, dict) and any(isinstance(sub_item, dict) and sub_item.get('is_red', False) for sub_item in item.values()):
                             is_red = True
                             break
                     class_name = 'red' if is_red else ''
